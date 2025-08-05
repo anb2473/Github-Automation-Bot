@@ -52,7 +52,7 @@ def wait_until_tmrw(offset):
         second=random.randint(10, 50)
     )
 
-    sleep_seconds = (target_time - now).total_seconds() - offset
+    sleep_seconds = (target_time - now).total_seconds() + offset
     print(f"Sleeping until {target_time} ({sleep_seconds / 3600:.2f} hours)")
     time.sleep(max(sleep_seconds, 0))
 
