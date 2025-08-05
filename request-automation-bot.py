@@ -12,6 +12,7 @@ load_dotenv()  # take environment variables from .env
 token = os.getenv("GITHUB_TOKEN")
 USERNAME = os.getenv("USERNAME")
 CHECK_FILE = os.getenv("CHECK_FILE")
+MAX_STARS = os.getenv("MAX_STARS")
 
 if not token or not USERNAME or not CHECK_FILE:
     raise ValueError("GITHUB_TOKEN and USERNAME must be set in the .env file")
@@ -80,7 +81,7 @@ while True:
     print("Beginning starring process")
 
     today = date.today().strftime("%Y-%m-%d")
-    query = f"stars:<5 pushed:{today}"
+    query = f"stars:<{MAX_STARS} pushed:{today}"
    
     url = f"https://api.github.com/search/repositories?q={query}&sort=updated&order=desc&per_page={
         min(REPOS_PER_PAGE + 
