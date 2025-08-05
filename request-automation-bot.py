@@ -6,13 +6,32 @@ import os
 import random
 import math
 import json
+from colorama import init, Fore, Style
+import sys
+
+init(autoreset=True)  # automatically reset colors after each print
 
 load_dotenv()  # take environment variables from .env
+
+def clear_terminal():
+    # For Windows
+    if os.name == 'nt':
+        os.system('cls')
+    # For Linux and macOS
+    else:
+        os.system('clear')
+
+clear_terminal()
 
 token = os.getenv("GITHUB_TOKEN")
 USERNAME = os.getenv("USERNAME")
 CHECK_FILE = os.getenv("CHECK_FILE")
 MAX_STARS = os.getenv("MAX_STARS")
+
+# Rainbow colors cycle (some bright colors)
+RAINBOW_COLORS = [
+    Fore.RED, Fore.YELLOW, Fore.GREEN, Fore.CYAN, Fore.BLUE, Fore.MAGENTA
+]
 
 if not token or not USERNAME or not CHECK_FILE:
     raise ValueError("GITHUB_TOKEN and USERNAME must be set in the .env file")
@@ -39,6 +58,26 @@ headers = {
 REPOS_PER_PAGE = int(os.getenv("REPOS_PER_PAGE", "100"))
 NUM_OF_PAGES = int(os.getenv("NUM_OF_PAGES", "1"))
 
+printed_once = False
+
+def print_rainbow_box(text, color_index):
+    global printed_once
+    color = RAINBOW_COLORS[int(color_index % len(RAINBOW_COLORS))]
+    length = len(text) + 4
+    top_bottom = color + "+" + "-" * (length - 2) + "+"
+    middle = color + "| " + Style.BRIGHT + text + Style.NORMAL + color + " |"
+    
+    if printed_once:
+        # Move cursor up 3 lines to overwrite previous box
+        sys.stdout.write('\033[F' * 3)
+    else:
+        printed_once = True
+
+    print(top_bottom)
+    print(middle)
+    print(top_bottom)
+    sys.stdout.flush()
+
 def wait_until_tmrw(offset):
     now = datetime.now()
 
@@ -55,7 +94,11 @@ def wait_until_tmrw(offset):
 
     sleep_seconds = (target_time - now).total_seconds() + offset
     print(f"Sleeping until {target_time} ({sleep_seconds / 3600:.2f} hours)")
-    time.sleep(max(sleep_seconds, 0))
+    while sleep_seconds > 0:
+        print_rainbow_box(f"Sleeping... {int(sleep_seconds)} seconds left", sleep_seconds)
+        time.sleep(min(1, sleep_seconds))
+        sleep_seconds -= min(1, sleep_seconds)
+    clear_terminal()
 
 def github_request(method, url, **kwargs):
     try:
@@ -74,7 +117,6 @@ def github_request(method, url, **kwargs):
         print(f"Request error for {url}: {e}")
         return None
 
-print("Running initial wait before beginning starring")
 wait_until_tmrw(offset=-24*60*60)    # Do not wait 2 days before starting, only wait until this night
 
 while True:
