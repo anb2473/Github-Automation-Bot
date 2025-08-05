@@ -97,8 +97,9 @@ def wait_until_tmrw(offset):
     try:
         while sleep_seconds > 0:
             print_rainbow_box(f"Sleeping... {int(sleep_seconds)} seconds left", sleep_seconds)
-            time.sleep(min(1, sleep_seconds))
-            sleep_seconds -= min(1, sleep_seconds)
+            now = datetime.now()
+            sleep_seconds = (target_time - now).total_seconds() + offset
+            time.sleep(1)
     except KeyboardInterrupt:  # discard error and exit program 
         exit()
     clear_terminal()
