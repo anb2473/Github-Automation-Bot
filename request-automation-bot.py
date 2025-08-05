@@ -30,7 +30,7 @@ MAX_STARS = os.getenv("MAX_STARS")
 
 # Rainbow colors cycle (some bright colors)
 RAINBOW_COLORS = [
-    Fore.RED, Fore.YELLOW, Fore.GREEN, Fore.CYAN, Fore.BLUE, Fore.MAGENTA
+    Fore.RED, Fore.YELLOW, Fore.GREEN, Fore.CYAN, Fore.MAGENTA,
 ]
 
 if not token or not USERNAME or not CHECK_FILE:
@@ -94,10 +94,13 @@ def wait_until_tmrw(offset):
 
     sleep_seconds = (target_time - now).total_seconds() + offset
     print(f"Sleeping until {target_time} ({sleep_seconds / 3600:.2f} hours)")
-    while sleep_seconds > 0:
-        print_rainbow_box(f"Sleeping... {int(sleep_seconds)} seconds left", sleep_seconds)
-        time.sleep(min(1, sleep_seconds))
-        sleep_seconds -= min(1, sleep_seconds)
+    try:
+        while sleep_seconds > 0:
+            print_rainbow_box(f"Sleeping... {int(sleep_seconds)} seconds left", sleep_seconds)
+            time.sleep(min(1, sleep_seconds))
+            sleep_seconds -= min(1, sleep_seconds)
+    except KeyboardInterrupt:  # discard error and exit program 
+        exit()
     clear_terminal()
 
 def github_request(method, url, **kwargs):
