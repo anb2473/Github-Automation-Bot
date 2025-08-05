@@ -3,23 +3,28 @@ from datetime import date, timedelta, datetime
 import time
 from dotenv import load_dotenv
 import os
+import random
+import math
 
 load_dotenv()  # take environment variables from .env
 
 token = os.getenv("GITHUB_TOKEN")
+USERNAME = os.getenv("USERNAME")
+
+if not token or not USERNAME:
+    raise ValueError("GITHUB_TOKEN and USERNAME must be set in the .env file")
+
 headers = {
     "Authorization": f"token {token}",
     "Accept": "application/vnd.github+json"
 }
-
-USERNAME = os.getenv("USERNAME")
 
 REPOS_PER_PAGE = int(os.getenv("REPOS_PER_PAGE", "100"))
 NUM_OF_PAGES = int(os.getenv("NUM_OF_PAGES", "1"))
 
 check_following_list = []
 
-def wait_until_next_1150pm():
+def wait_until_tmrw():
     now = datetime.now()
 
     # Calculate 11:50 PM the next day
@@ -28,53 +33,100 @@ def wait_until_next_1150pm():
         year=next_day.year,
         month=next_day.month,
         day=next_day.day,
-        hour=23,
-        minute=50,
-        second=0
+        hour=22 + random.randint(-1, 1),
+        minute=0 + random.randint(0, 30),
+        second=random.randint(10, 50)
     )
 
     sleep_seconds = (target_time - now).total_seconds()
     print(f"Sleeping until {target_time} ({sleep_seconds / 3600:.2f} hours)")
     time.sleep(sleep_seconds)
 
+def github_request(method, url, **kwargs):
+    try:
+        response = requests.request(method, url, headers=headers, **kwargs)
+        if response.status_code == 403 and 'X-RateLimit-Remaining' in response.headers:
+            remaining = int(response.headers['X-RateLimit-Remaining'])
+            if remaining == 0:
+                reset_time = int(response.headers['X-RateLimit-Reset'])
+                sleep_sec = reset_time - int(time.time()) + 5
+                print(f"Rate limit exceeded, sleeping for {sleep_sec} seconds")
+                time.sleep(sleep_sec)
+                return github_request(method, url, **kwargs)  # Retry after sleep
+        response.raise_for_status()
+        return response
+    except requests.RequestException as e:
+        print(f"Request error for {url}: {e}")
+        return None
+
+print("Running initial wait before beginning starring")
+wait_until_tmrw()
+
 while True:
+    print("Beginning starring process")
+
     today = date.today().strftime("%Y-%m-%d")
     query = f"stars:<5 pushed:{today}"
    
-    url = f"https://api.github.com/search/repositories?q={query}&sort=updated&order=desc&per_page={REPOS_PER_PAGE}&page={NUM_OF_PAGES}"
+    url = f"https://api.github.com/search/repositories?q={query}&sort=updated&order=desc&per_page={
+        min(REPOS_PER_PAGE + 
+                random.randint(REPOS_PER_PAGE - math.ceil(REPOS_PER_PAGE / 10), 
+                REPOS_PER_PAGE + math.ceil(REPOS_PER_PAGE / 10)),
+            100)
+        }&page={NUM_OF_PAGES}"
 
-    response = requests.get(url, headers=headers)
+    response = github_request("GET", url)
+    if response is None:
+        print("Failed request, skipping...")
+        wait_until_tmrw()
+        continue
+
     data = response.json()
 
     if 'items' not in data:
         print("No repos found or API error:", data)
-        wait_until_next_1150pm()
+        wait_until_tmrw()
         continue
 
-    for repo in data['items']:
+    repos = data['items']
+    random.shuffle(repos)
+
+    for repo in repos:
         url = f"https://api.github.com/user/starred/{repo['full_name']}"
-        response = requests.put(url, headers=headers)
+        response = github_request("PUT", url)
+        if response is None:
+            print("Failed request, skipping...")
+            wait_until_tmrw()
+            continue
         if response.status_code != 204:
             print(f"Error sending request to https://api.github.com/user/starred/{repo['full_name']}, {response.status_code}")
         owner = repo['owner']['login']
         check_following_list.append([owner, date.today(), repo['full_name']])
 
+        time.sleep(random.uniform(5, 15))
+
+    print("Checking followers")
+
     for potential_follower, starred_date, starred_repo in check_following_list[:]: 
         # iterate on copy of check_following_list to avoid issues editing acual list
         url = f"https://api.github.com/users/{potential_follower}/following/{USERNAME}"
-        response = requests.get(url, headers=headers)
+        response = github_request("GET", url)
+        if response is None:
+            print("Failed request, skipping...")
+            continue
 
         if response.status_code == 204: # User has followed
+            print("Successful follow")
             url = f"https://api.github.com/user/following/{potential_follower}"
-            response = requests.put(url, headers=headers)
+            github_request("PUT", url)
         else:   # User has not followed
-            if date.today() > starred_date + timedelta(days=3): # More than 3 days have passed since starring
+            if (datetime.today().date() - starred_date).days > 3:  # More than 3 days have passed since starring
                 url = f"https://api.github.com/user/starred/{starred_repo}"
-                requests.delete(url, headers=headers)
+                github_request("DELETE", url)
 
                 url = f"https://api.github.com/user/following/{potential_follower}"
-                requests.delete(url, headers=headers)
+                github_request("DELETE", url)
 
                 check_following_list.remove([potential_follower, starred_date, starred_repo])
 
-    wait_until_next_1150pm()
+    wait_until_tmrw()
