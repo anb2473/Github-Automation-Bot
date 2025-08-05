@@ -96,7 +96,7 @@ def wait_until_tmrw(offset):
     print(f"Sleeping until {target_time} ({sleep_seconds / 3600:.2f} hours)")
     try:
         while sleep_seconds > 0:
-            print_rainbow_box(f"Sleeping... {int(sleep_seconds)} seconds left", sleep_seconds)
+            print_rainbow_box(f"Sleeping... {int(sleep_seconds)} seconds or {round(sleep_seconds / 3600, 2)} hours left", sleep_seconds)
             now = datetime.now()
             sleep_seconds = (target_time - now).total_seconds() + offset
             time.sleep(1)
