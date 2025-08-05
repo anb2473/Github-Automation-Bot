@@ -5,14 +5,30 @@ from dotenv import load_dotenv
 import os
 import random
 import math
+import json
 
 load_dotenv()  # take environment variables from .env
 
 token = os.getenv("GITHUB_TOKEN")
 USERNAME = os.getenv("USERNAME")
+CHECK_FILE = os.getenv("CHECK_FILE")
 
-if not token or not USERNAME:
+if not token or not USERNAME or not CHECK_FILE:
     raise ValueError("GITHUB_TOKEN and USERNAME must be set in the .env file")
+
+def load_check_list():
+    if os.path.exists(CHECK_FILE):
+        with open(CHECK_FILE, "r") as f:
+            raw = json.load(f)
+            return [[entry[0], datetime.strptime(entry[1], "%Y-%m-%d").date(), entry[2]] for entry in raw]
+    return []
+
+check_following_list = load_check_list()
+
+def save_check_list():
+    with open(CHECK_FILE, "w") as f:
+        serializable = [[entry[0], entry[1].strftime("%Y-%m-%d"), entry[2]] for entry in check_following_list]
+        json.dump(serializable, f)
 
 headers = {
     "Authorization": f"token {token}",
@@ -22,9 +38,7 @@ headers = {
 REPOS_PER_PAGE = int(os.getenv("REPOS_PER_PAGE", "100"))
 NUM_OF_PAGES = int(os.getenv("NUM_OF_PAGES", "1"))
 
-check_following_list = []
-
-def wait_until_tmrw():
+def wait_until_tmrw(offset):
     now = datetime.now()
 
     # Calculate 11:50 PM the next day
@@ -38,9 +52,9 @@ def wait_until_tmrw():
         second=random.randint(10, 50)
     )
 
-    sleep_seconds = (target_time - now).total_seconds()
+    sleep_seconds = (target_time - now).total_seconds() - offset
     print(f"Sleeping until {target_time} ({sleep_seconds / 3600:.2f} hours)")
-    time.sleep(sleep_seconds)
+    time.sleep(max(sleep_seconds, 0))
 
 def github_request(method, url, **kwargs):
     try:
@@ -60,7 +74,7 @@ def github_request(method, url, **kwargs):
         return None
 
 print("Running initial wait before beginning starring")
-wait_until_tmrw()
+wait_until_tmrw(offset=-24*60*60)    # Do not wait 2 days before starting, only wait until this night
 
 while True:
     print("Beginning starring process")
@@ -128,5 +142,7 @@ while True:
                 github_request("DELETE", url)
 
                 check_following_list.remove([potential_follower, starred_date, starred_repo])
+
+    save_check_list()
 
     wait_until_tmrw()
