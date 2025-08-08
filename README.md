@@ -1,3 +1,7 @@
+# GitHub Automation Bot
+
+This automation bot uses the GitHub API in order to make certian tasks more efficient.
+
 # How to Use
 
 .env file should look like:
