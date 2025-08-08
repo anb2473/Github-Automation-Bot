@@ -1,3 +1,5 @@
 requests
 dotenv
 colorama
+pyfiglet
+rich
